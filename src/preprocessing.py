@@ -94,9 +94,13 @@ def load_and_preprocess():
     # ==================================================
     # 3. FILTER PERIHAL KOSONG
     # ==================================================
-    df["Perihal"] = df["Perihal"].astype(str)
-    df = df[df["Perihal"].str.strip() != ""]
-    df = df[df["Perihal"].str.lower() != "nan"]
+    df["Perihal"] = df["Perihal"].astype(str).str.strip()
+    
+    df = df[
+    (df["Perihal"] != "") &
+    (~df["Perihal"].str.fullmatch(r"-+")) &   # HAPUS "-", "--", "---"
+    (df["Perihal"].str.lower() != "nan")
+]
 
 
     # ==================================================
@@ -118,8 +122,8 @@ def load_and_preprocess():
         if not isinstance(x, str):
             return None
         x = re.sub(r"^\d+\s*[-.]*\s*", "", x).strip().upper()
-        return None if x in ["", "-", "NAN"] else x
-
+        return None if x in ["", "-", "--", "NAN"] else x
+    
     df["Kategori_Target"] = df["Tipe"].apply(clean_label)
     df = df.dropna(subset=["Kategori_Target"])
 

@@ -178,7 +178,24 @@ if df is not None:
         return txt
 
     df['Teks_Input_Gabungan'] = df.apply(_reconstruct_input, axis=1)
-    # ---------------------------------------------------------
+    
+    # ============================================================
+    # >>> TAMBAHAN 1: FILTER TEKS INVALID (TIDAK GANTI KODE LAMA)
+    # ============================================================
+    def is_valid_text(s):
+        if not isinstance(s, str):
+            return False
+        s = s.strip()
+        if s == "":
+            return False
+        if re.fullmatch(r"-+", s):   # --, ---, ----
+            return False
+        if len(s) < 10:              # teks terlalu pendek
+            return False
+        return True
+
+    # >>> TAMBAHAN 2: FILTER SETELAH TEKS TERBENTUK
+    df = df[df['Teks_Input_Gabungan'].apply(is_valid_text)]
 
     # --- Ensure Teks_For_Clustering exists (Bawaan kode lama, biarkan saja) ---
     if "Teks_For_Clustering" not in df.columns:
@@ -191,6 +208,9 @@ if df is not None:
             return txt
 
         df["Teks_For_Clustering"] = df.apply(_prepare_for_clustering, axis=1)
+
+        # >>> TAMBAHAN 3: FILTER KHUSUS UNTUK CLUSTERING
+    df = df[df["Teks_For_Clustering"].apply(is_valid_text)]
 
     # --- Final safety (no NaN, correct dtype) ---
     df["Teks_For_Clustering"] = df["Teks_For_Clustering"].fillna("").astype(str)
@@ -210,7 +230,8 @@ with st.sidebar:
         "📈 Evaluasi Model (DL)",
         "🔍 Analisis Korelasi Fitur",
         "🧩 Clustering (K-Means)",
-        "🤖 Simulasi Prediksi"
+        "🤖 Simulasi Prediksi",
+        "📥 Data Baru (CSV)" 
     ])
     st.markdown("---")
     st.info("Input AI: Perihal + Dari/Untuk (untuk prediksi & clustering)")
@@ -280,9 +301,9 @@ elif menu == "📈 Evaluasi Model (DL)":
 
         # DATA DARI SCREENSHOT TERMINAL ANDA (JANGAN DIUBAH AGAR SAMA DENGAN LAPORAN)
         official_results = [
-            {'Model': 'LSTM',    'Akurasi': 0.8349},
-            {'Model': 'Bi-LSTM', 'Akurasi': 0.8109},
-            {'Model': 'CNN',     'Akurasi': 0.8670}
+            {'Model': 'LSTM',    'Akurasi': 0.8032},
+            {'Model': 'Bi-LSTM', 'Akurasi': 0.7819},
+            {'Model': 'CNN',     'Akurasi': 0.8582}
         ]
         
         df_res = pd.DataFrame(official_results)
@@ -536,6 +557,30 @@ elif menu == "🧩 Clustering (K-Means)":
                 except Exception as e:
                     st.warning(f"Error saat membuat distribusi Dari/Untuk: {e}")
 
+                                # ======================================
+            # 📌 KEANGGOTAAN CLUSTER (TAMBAHAN SAJA)
+            # ======================================
+            st.markdown("---")
+            st.markdown("### 📌 Keanggotaan Cluster (Isi Setiap Kelompok)")
+
+            selected_cluster = st.selectbox(
+                "Pilih Cluster untuk melihat anggotanya",
+                sorted(df_c["Cluster"].unique())
+            )
+
+            anggota_cluster = df_c[df_c["Cluster"] == selected_cluster]
+
+            st.write(f"Jumlah anggota Cluster {selected_cluster}: {len(anggota_cluster)}")
+
+            st.dataframe(
+                anggota_cluster[
+                    ["Perihal", "Dari/Untuk", "Tipe", "Cluster"]
+                ],
+                use_container_width=True,
+                height=350
+            )
+
+
 # ==========================================
 # 8. HALAMAN: SIMULASI PREDIKSI
 # ==========================================
@@ -570,9 +615,108 @@ elif menu == "🤖 Simulasi Prediksi":
                     f"<span style='font-size:18px;'>{lbl}</span><br><small>{conf:.1f}% confidence</small></div>",
                     unsafe_allow_html=True
                 )
+# ==========================================
+# 10. HALAMAN: DATA BARU (CSV)
+# ==========================================
+elif menu == "📥 Data Baru (CSV)":
+    st.subheader("📥 Upload Data Baru (CSV / Excel)")
+    st.caption("Data ini tidak digunakan untuk training, hanya untuk prediksi & analisis.")
+
+    uploaded_file = st.file_uploader(
+        "Upload file CSV / Excel",
+        type=["csv", "xls", "xlsx"]
+    )
+
+    if uploaded_file is not None:
+        file_name = uploaded_file.name.lower()
+
+        try:
+            if file_name.endswith(".csv"):
+                df_new = pd.read_csv(uploaded_file)
+            elif file_name.endswith((".xls", ".xlsx")):
+                df_new = pd.read_excel(uploaded_file)
+            else:
+                st.error("Format file tidak didukung")
+                st.stop()
+        except Exception as e:
+            st.error(f"Gagal membaca file: {e}")
+            st.stop()
+
+        st.success("File berhasil diupload")
+        st.dataframe(df_new.head(10), use_container_width=True)
+
+        # ==============================
+        # VALIDASI KOLOM WAJIB
+        # ==============================
+        required_cols = ["Perihal", "Dari/Untuk"]
+        missing = [c for c in required_cols if c not in df_new.columns]
+
+        if missing:
+            st.error(f"Kolom wajib tidak ditemukan: {missing}")
+            st.stop()
+
+        # ==============================
+        # PREPROCESS
+        # ==============================
+        def preprocess_incoming(row):
+            p = str(row.get("Perihal", "")).lower()
+            d = str(row.get("Dari/Untuk", "")).lower()
+            j = str(row.get("JenisSurat", "")).lower() if "JenisSurat" in row else ""
+            text = f"{j} {p} {d}"
+            text = re.sub(r"[^a-z0-9\s]", " ", text)
+            return re.sub(r"\s+", " ", text).strip()
+
+        df_new["Teks_Input_Gabungan"] = df_new.apply(preprocess_incoming, axis=1)
+
+        # ==============================
+        # SIMPAN KE BACKEND
+        # ==============================
+        os.makedirs("data/incoming", exist_ok=True)
+        save_path = f"data/incoming/{uploaded_file.name}"
+        df_new.to_csv(save_path, index=False)
+
+        st.info(f"Data disimpan di backend: {save_path}")
+
+        st.markdown("---")
+        st.markdown("### 🤖 Prediksi Otomatis Data Baru")
+
+        model_choice = st.selectbox(
+            "Pilih Model",
+            ["LSTM", "Bi-LSTM", "CNN"]
+        )
+
+        if st.button("🚀 Jalankan Prediksi"):
+            if tokenizer is None or label_encoder is None:
+                st.error("Tokenizer / Label Encoder tidak ditemukan")
+                st.stop()
+
+            model_map = {
+                "LSTM": lstm,
+                "Bi-LSTM": bilstm,
+                "CNN": cnn
+            }
+
+            model_used = model_map[model_choice]
+
+            seq = pad_sequences(
+                tokenizer.texts_to_sequences(df_new["Teks_Input_Gabungan"]),
+                maxlen=100
+            )
+
+            preds = model_used.predict(seq, verbose=0)
+            idx = np.argmax(preds, axis=1)
+
+            df_new["Prediksi_Tipe"] = label_encoder.inverse_transform(idx)
+            df_new["Confidence (%)"] = np.max(preds, axis=1) * 100
+
+            st.success("Prediksi selesai")
+            st.dataframe(
+                df_new[["Perihal", "Dari/Untuk", "Prediksi_Tipe", "Confidence (%)"]],
+                use_container_width=True
+            )
 
 # ==========================================
-# 9. FOOTER - informasi kecil
+# 10. FOOTER - informasi kecil
 # ==========================================
 st.markdown("---")
 st.markdown("Built for: Internship 1 — Klasifikasi Surat. Pastikan `run_pipeline.py` sudah dijalankan untuk membuat model & file analisis fitur.")
