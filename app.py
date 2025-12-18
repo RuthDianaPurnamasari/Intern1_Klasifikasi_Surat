@@ -21,51 +21,52 @@ from src.clustering import (
     analyze_cluster_distribution,
     get_cluster_breakdown
 )
+from src.clustering import normalize_category
 
 # ============================================================
 # Helper: normalize_category (diambil/adaptasi dari run_pipeline.py)
 # ============================================================
-def normalize_category(text):
-    """
-    Normalisasi sederhana untuk kolom kategori/tipe/dari-untuk:
-    - Hapus awalan nomor seperti "5 - " atau "03." atau "1."
-    - Lowercase
-    - Strip whitespace
-    - Ganti multiple spaces dengan single space
-    """
-    if pd.isna(text):
-        return ""
-    s = str(text)
-    # Hapus awalan nomor/format "123 - " atau "12." atau "1)"
-    s = re.sub(r"^\s*\d+\s*[-.)]?\s*", "", s)
-    # Hilangkan karakter non-alphanumeric kecuali spasi, slash, dan koma
-    s = re.sub(r"[^\w\s\/\,\-\.]", " ", s)
-    s = s.lower().strip()
-    # Ganti beberapa spasi menjadi satu
-    s = re.sub(r"\s+", " ", s)
-    return s
+# def normalize_category(text):
+#     """
+#     Normalisasi sederhana untuk kolom kategori/tipe/dari-untuk:
+#     - Hapus awalan nomor seperti "5 - " atau "03." atau "1."
+#     - Lowercase
+#     - Strip whitespace
+#     - Ganti multiple spaces dengan single space
+#     """
+#     if pd.isna(text):
+#         return ""
+#     s = str(text)
+#     # Hapus awalan nomor/format "123 - " atau "12." atau "1)"
+#     s = re.sub(r"^\s*\d+\s*[-.)]?\s*", "", s)
+#     # Hilangkan karakter non-alphanumeric kecuali spasi, slash, dan koma
+#     s = re.sub(r"[^\w\s\/\,\-\.]", " ", s)
+#     s = s.lower().strip()
+#     # Ganti beberapa spasi menjadi satu
+#     s = re.sub(r"\s+", " ", s)
+#     return s
 # ============================================================
 # Helper: normalize_category (diambil/adaptasi dari run_pipeline.py)
 # ============================================================
-def normalize_category(text):
-    """
-    Normalisasi sederhana untuk kolom kategori/tipe/dari-untuk:
-    - Hapus awalan nomor seperti "5 - " atau "03." atau "1."
-    - Lowercase
-    - Strip whitespace
-    - Ganti multiple spaces dengan single space
-    """
-    if pd.isna(text):
-        return ""
-    s = str(text)
-    # Hapus awalan nomor/format "123 - " atau "12." atau "1)"
-    s = re.sub(r"^\s*\d+\s*[-.)]?\s*", "", s)
-    # Hilangkan karakter non-alphanumeric kecuali spasi, slash, dan koma
-    s = re.sub(r"[^\w\s\/\,\-\.]", " ", s)
-    s = s.lower().strip()
-    # Ganti beberapa spasi menjadi satu
-    s = re.sub(r"\s+", " ", s)
-    return s
+# def normalize_category(text):
+#     """
+#     Normalisasi sederhana untuk kolom kategori/tipe/dari-untuk:
+#     - Hapus awalan nomor seperti "5 - " atau "03." atau "1."
+#     - Lowercase
+#     - Strip whitespace
+#     - Ganti multiple spaces dengan single space
+#     """
+#     if pd.isna(text):
+#         return ""
+#     s = str(text)
+#     # Hapus awalan nomor/format "123 - " atau "12." atau "1)"
+#     s = re.sub(r"^\s*\d+\s*[-.)]?\s*", "", s)
+#     # Hilangkan karakter non-alphanumeric kecuali spasi, slash, dan koma
+#     s = re.sub(r"[^\w\s\/\,\-\.]", " ", s)
+#     s = s.lower().strip()
+#     # Ganti beberapa spasi menjadi satu
+#     s = re.sub(r"\s+", " ", s)
+#     return s
 
 
 # ==========================================
@@ -115,9 +116,14 @@ def load_all_resources():
 
         # Models & tokenizers
         # Perhatikan nama file model di folder 'models' harus sesuai
+
         lstm = load_model('models/model_lstm.h5') if os.path.exists('models/model_lstm.h5') else None
-        bilstm = load_model('models/model_bi-lstm.h5') if os.path.exists('models/model_bi-lstm.h5') else None
+        bilstm = load_model('models/model_bilstm.h5') if os.path.exists('models/model_bilstm.h5') else None
         cnn = load_model('models/model_cnn.h5') if os.path.exists('models/model_cnn.h5') else None
+
+        # lstm = load_model('models/model_lstm.h5') if os.path.exists('models/model_lstm.h5') else None
+        # bilstm = load_model('models/model_bi-lstm.h5') if os.path.exists('models/model_bi-lstm.h5') else None
+        # cnn = load_model('models/model_cnn.h5') if os.path.exists('models/model_cnn.h5') else None
 
         tokenizer = joblib.load('models/tokenizer.pkl') if os.path.exists('models/tokenizer.pkl') else None
         label_encoder = joblib.load('models/label_encoder.pkl') if os.path.exists('models/label_encoder.pkl') else None
