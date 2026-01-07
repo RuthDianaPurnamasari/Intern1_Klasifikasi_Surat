@@ -721,6 +721,78 @@ elif menu == "📥 Data Baru (CSV)":
                 use_container_width=True
             )
 
+            # ============================================================
+            # TAMBAHAN: EVALUASI MODEL BERDASARKAN DATA BARU YANG DIUPLOAD
+            # ============================================================
+            # Hanya jalankan jika data baru memiliki kolom target (label asli) untuk dibandingkan
+            target_col_name = next((c for c in df_new.columns if "tipe" in c.lower() or "kategori" in c.lower()), None)
+
+            if target_col_name:
+                st.markdown("### 📊 Hasil Evaluasi Model pada Data Baru")
+                
+                # Bersihkan label target dari data baru menggunakan fungsi yang sudah ada
+                y_true_raw = df_new[target_col_name].apply(normalize_category).str.upper()
+                
+                # Filter hanya label yang dikenali oleh label_encoder model
+                known_labels = label_encoder.classes_
+                mask = y_true_raw.isin(known_labels)
+                
+                if mask.any():
+                    y_true = label_encoder.transform(y_true_raw[mask])
+                    y_pred = idx[mask] # Mengambil index prediksi dari baris yang valid
+                    
+                    # Hitung Akurasi
+                    acc_new = accuracy_score(y_true, y_pred)
+                    
+                    # Tampilkan Metrik Baru
+                    c1, c2 = st.columns(2)
+                    c1.metric(f"Akurasi {model_choice} (Data Baru)", f"{acc_new:.2%}")
+                    c2.info(f"Evaluasi dilakukan pada {mask.sum()} baris data yang labelnya dikenali model.")
+                    
+                    # Tampilkan Confusion Matrix Data Baru
+                    from sklearn.metrics import confusion_matrix
+                    cm_new = confusion_matrix(y_true, y_pred)
+                    fig_cm_new, ax_cm_new = plt.subplots(figsize=(8, 5))
+                    sns.heatmap(cm_new, annot=True, fmt='d', cmap='Purples',
+                                xticklabels=known_labels, yticklabels=known_labels)
+                    plt.title(f"Confusion Matrix: {model_choice} (Data Baru)")
+                    plt.ylabel('Aktual'); plt.xlabel('Prediksi')
+                    st.pyplot(fig_cm_new)
+                else:
+                    st.warning("Label pada kolom target data baru tidak cocok dengan kategori yang dipelajari model.")
+            else:
+                st.info("💡 Tips: Tambahkan kolom 'Tipe' pada file CSV Anda jika ingin melihat evaluasi akurasi otomatis.")
+
+        # if st.button("🚀 Jalankan Prediksi"):
+        #     if tokenizer is None or label_encoder is None:
+        #         st.error("Tokenizer / Label Encoder tidak ditemukan")
+        #         st.stop()
+
+        #     model_map = {
+        #         "LSTM": lstm,
+        #         "Bi-LSTM": bilstm,
+        #         "CNN": cnn
+        #     }
+
+        #     model_used = model_map[model_choice]
+
+        #     seq = pad_sequences(
+        #         tokenizer.texts_to_sequences(df_new["Teks_Input_Gabungan"]),
+        #         maxlen=100
+        #     )
+
+        #     preds = model_used.predict(seq, verbose=0)
+        #     idx = np.argmax(preds, axis=1)
+
+        #     df_new["Prediksi_Tipe"] = label_encoder.inverse_transform(idx)
+        #     df_new["Confidence (%)"] = np.max(preds, axis=1) * 100
+
+        #     st.success("Prediksi selesai")
+        #     st.dataframe(
+        #         df_new[["Perihal", "Dari/Untuk", "Prediksi_Tipe", "Confidence (%)"]],
+        #         use_container_width=True
+        #     )
+
 # ==========================================
 # 10. FOOTER - informasi kecil
 # ==========================================
